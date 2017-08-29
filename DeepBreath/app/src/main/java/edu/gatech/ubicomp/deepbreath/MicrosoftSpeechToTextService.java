@@ -81,6 +81,22 @@ public class MicrosoftSpeechToTextService implements ISpeechRecognitionServerEve
         }
     }
 
+    public SpeechToTextCallback getSpeechToTextCallback() {
+        return speechToTextCallback;
+    }
+
+    public void setSpeechToTextCallback(SpeechToTextCallback speechToTextCallback) {
+        this.speechToTextCallback = speechToTextCallback;
+    }
+
+    public SpeechToTextCallback getPartialSpeechToTextCallback() {
+        return partialSpeechToTextCallback;
+    }
+
+    public void setPartialSpeechToTextCallback(SpeechToTextCallback partialSpeechToTextCallback) {
+        this.partialSpeechToTextCallback = partialSpeechToTextCallback;
+    }
+
     @Override
     public void onIntentReceived(String s) {
 

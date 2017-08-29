@@ -45,7 +45,7 @@ public class MainActivity extends AppCompatActivity {
 
     private Button startButton;
     private TextView counterText;
-    private AndroidSpeechToTextService androidSpeechToTextService;
+    private MicrosoftSpeechToTextService microsoftSpeechToTextService;
 
     private AudioService audioService;
     private AudioDispatcher dispatcher;
@@ -94,26 +94,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initializeSpeechService() {
-        androidSpeechToTextService = AndroidSpeechToTextService.getInstance(this);
-        androidSpeechToTextService.setSpeechToTextCallback(new SpeechToTextCallback() {
+        microsoftSpeechToTextService = MicrosoftSpeechToTextService.getInstance(this);
+        microsoftSpeechToTextService.setSpeechToTextCallback(new SpeechToTextCallback() {
             @Override
             public void process(String result) {
-                int sayCount = countMatches(result, sayWord);
-                Log.v("SpeechToTextCallback",
-                        result + " count: " + sayCount);
-                setCounterCount(sayCount);
+                Log.v("SSTCallback", result);
             }
         });
-        androidSpeechToTextService.setPartialSpeechToTextCallback(new SpeechToTextCallback() {
+        microsoftSpeechToTextService.setPartialSpeechToTextCallback(new SpeechToTextCallback() {
             @Override
             public void process(String result) {
-                int sayCount = countMatches(result, sayWord);
-                if (sayCount == 0) {
-                    return;
-                }
-                Log.v("PSpeechToTextCallback",
-                        "partial: " + result + " count: " + sayCount);
-                setCounterCount(sayCount);
+                Log.v("Partial SSTCallback", result);
             }
         });
     }
@@ -122,7 +113,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-//        initializeSpeechService();
+        initializeSpeechService();
         initializeRecordService();
         counterText = (TextView) findViewById(R.id.counterText);
         startButton = (Button) findViewById(R.id.startButton);
@@ -148,17 +139,5 @@ public class MainActivity extends AppCompatActivity {
 
     private void setCounterCount(int count) {
         counterText.setText("Counter: " + count);
-    }
-
-    private void beginRecording() {
-        setCounterCount(0);
-        androidSpeechToTextService.startListening();
-        currentRecord = new AudioRecording("" + System.currentTimeMillis());
-    }
-
-    private void endRecording() {
-        androidSpeechToTextService.stopListening();
-        saveAudioRecordingToFile(currentRecord);
-        currentRecord = null;
     }
 }
