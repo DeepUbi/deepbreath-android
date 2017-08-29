@@ -122,18 +122,20 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        initializeSpeechService();
+//        initializeSpeechService();
+        initializeRecordService();
         counterText = (TextView) findViewById(R.id.counterText);
         startButton = (Button) findViewById(R.id.startButton);
         startButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Log.v("MainActivity", "startButton clicked");
-                if (!androidSpeechToTextService.getIsListening()) {
-                    beginRecording();
-                } else {
-                    endRecording();
+                if (currentRecord != null) {
+                    saveAudioRecordingToFile(currentRecord);
+                    Log.v("MainActivity", "currentRecord saved");
                 }
+                currentRecord = new AudioRecording("" + System.currentTimeMillis());
+                setCounterCount(0);
             }
         });
 
