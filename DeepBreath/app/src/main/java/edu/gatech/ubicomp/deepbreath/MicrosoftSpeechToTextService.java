@@ -1,13 +1,14 @@
 package edu.gatech.ubicomp.deepbreath;
 
 import android.app.Activity;
+import android.util.Log;
 import com.microsoft.cognitiveservices.speechrecognition.*;
 
 import java.io.*;
 
 public class MicrosoftSpeechToTextService implements ISpeechRecognitionServerEvents {
     public static final String MS_STT_LANGUAGE = "en-us";
-    public static final SpeechRecognitionMode MS_STT_MODE = SpeechRecognitionMode.LongDictation;
+    public static final SpeechRecognitionMode MS_STT_MODE = SpeechRecognitionMode.ShortPhrase;
 
     private static MicrosoftSpeechToTextService ourInstance = null;
 
@@ -31,11 +32,12 @@ public class MicrosoftSpeechToTextService implements ISpeechRecognitionServerEve
     private MicrosoftSpeechToTextService(Activity activity) {
         this.activity = activity;
         dataRecognitionClient = SpeechRecognitionServiceFactory.createDataClient(activity, MS_STT_MODE, MS_STT_LANGUAGE,
-                null, Secret.MS_STT_KEY);
+                this, Secret.MS_STT_KEY);
     }
 
     @Override
     public void onPartialResponseReceived(String s) {
+        Log.v("MSSTTService", "onPartialResponseReceived");
         if (partialSpeechToTextCallback != null) {
             partialSpeechToTextCallback.process(s);
         }
@@ -43,6 +45,7 @@ public class MicrosoftSpeechToTextService implements ISpeechRecognitionServerEve
 
     @Override
     public void onFinalResponseReceived(RecognitionResult recognitionResult) {
+        Log.v("MSSTTService", "onFinalResponseReceived");
         RecognizedPhrase[] results = recognitionResult.Results;
         if (results.length > 0) {
             RecognizedPhrase bestResult = results[0];
@@ -74,23 +77,15 @@ public class MicrosoftSpeechToTextService implements ISpeechRecognitionServerEve
                 }
             } while (bytesRead > 0);
         } catch (IOException e) {
-            Contract.fail();
             e.printStackTrace();
+            Contract.fail();
         } finally {
             dataRecognitionClient.endAudio();
         }
     }
 
-    public SpeechToTextCallback getSpeechToTextCallback() {
-        return speechToTextCallback;
-    }
-
     public void setSpeechToTextCallback(SpeechToTextCallback speechToTextCallback) {
         this.speechToTextCallback = speechToTextCallback;
-    }
-
-    public SpeechToTextCallback getPartialSpeechToTextCallback() {
-        return partialSpeechToTextCallback;
     }
 
     public void setPartialSpeechToTextCallback(SpeechToTextCallback partialSpeechToTextCallback) {
@@ -99,16 +94,16 @@ public class MicrosoftSpeechToTextService implements ISpeechRecognitionServerEve
 
     @Override
     public void onIntentReceived(String s) {
-
+        Log.v("MSSTTService", "onIntentReceived");
     }
 
     @Override
     public void onError(int i, String s) {
-
+        Log.v("MSSTTService", "onError");
     }
 
     @Override
     public void onAudioEvent(boolean b) {
-
+        Log.v("MSSTTService", "onAudioEvent");
     }
 }

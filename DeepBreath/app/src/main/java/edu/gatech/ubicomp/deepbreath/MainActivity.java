@@ -15,6 +15,7 @@ import be.tarsos.dsp.io.TarsosDSPAudioFormat;
 import be.tarsos.dsp.writer.WaveHeader;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
@@ -35,6 +36,9 @@ public class MainActivity extends AppCompatActivity {
                     audioRecord.getRecordWav().seek(0);
                     audioRecord.getRecordWav().write(header.toByteArray());
                     audioRecord.getRecordWav().close();
+                    if (microsoftSpeechToTextService != null) {
+                        microsoftSpeechToTextService.dataRecognition(new File(audioRecord.getBaseFilePath() + ".wav"));
+                    }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -121,16 +125,25 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 Log.v("MainActivity", "startButton clicked");
-                if (currentRecord != null) {
-                    saveAudioRecordingToFile(currentRecord);
-                    Log.v("MainActivity", "currentRecord saved");
+                if (currentRecord == null) {
+                    beginRecord();
+                } else {
+                    endRecord();
                 }
-                currentRecord = new AudioRecording("" + System.currentTimeMillis());
-                setCounterCount(0);
             }
         });
-
     }
+
+    private void beginRecord() {
+        currentRecord = new AudioRecording("" + System.currentTimeMillis());
+        setCounterCount(0);
+    }
+
+    private void endRecord() {
+        AudioRecording processRecord = currentRecord;
+        currentRecord = null;
+        saveAudioRecordingToFile(processRecord);
+}
 
     private void saveAudioRecordingToFile(AudioRecording audioRecording) {
         AudioRecordingSaveTask saveTask = new AudioRecordingSaveTask();
