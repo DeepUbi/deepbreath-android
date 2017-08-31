@@ -25,6 +25,10 @@ public class MainActivity extends AppCompatActivity {
         protected Void doInBackground(Object... params) {
             TarsosDSPAudioFormat audioFormat = dispatcher.getFormat();
             AudioRecording audioRecord = (AudioRecording) params[0];
+            boolean deleteFile = ((Boolean) params[1]).booleanValue();
+            boolean shortMode = ((Boolean) params[2]).booleanValue();
+            SpeechToTextCallback partialCallback = (SpeechToTextCallback) params[3];
+            SpeechToTextCallback finalCallback = (SpeechToTextCallback) params[4];
             Log.v("AudioRecordingPSTask", "audioRecord base file: " + audioRecord.getBaseFilePath());
             WaveHeader waveHeader = new WaveHeader(WaveHeader.FORMAT_PCM, (short) audioFormat.getChannels(),
                     (int) audioFormat.getSampleRate(), (short) 16, audioRecord.getRecordWavLength());
@@ -36,32 +40,10 @@ public class MainActivity extends AppCompatActivity {
                     audioRecord.getRecordWav().write(header.toByteArray());
                     audioRecord.getRecordWav().close();
                     if (microsoftSpeechToTextService != null) {
-                        microsoftSpeechToTextService.dataRecognition(new File(audioRecord.getBaseFilePath() + ".wav"));
+                        microsoftSpeechToTextService.dataRecognition(
+                                new File(audioRecord.getBaseFilePath() + ".wav"), deleteFile, shortMode,
+                                partialCallback, finalCallback);
                     }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            return null;
-        }
-    }
-
-     private class AudioRecordingSaveTask extends AsyncTask<Object, Void, Void> {
-
-        @Override
-        protected Void doInBackground(Object... params) {
-            TarsosDSPAudioFormat audioFormat = dispatcher.getFormat();
-            AudioRecording audioRecord = (AudioRecording) params[0];
-            Log.v("AudioRecordingPSTask", "audioRecord base file: " + audioRecord.getBaseFilePath());
-            WaveHeader waveHeader = new WaveHeader(WaveHeader.FORMAT_PCM, (short) audioFormat.getChannels(),
-                    (int) audioFormat.getSampleRate(), (short) 16, audioRecord.getRecordWavLength());
-            ByteArrayOutputStream header = new ByteArrayOutputStream();
-            try {
-                if (audioRecord != null) {
-                    waveHeader.write(header);
-                    audioRecord.getRecordWav().seek(0);
-                    audioRecord.getRecordWav().write(header.toByteArray());
-                    audioRecord.getRecordWav().close();
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -80,10 +62,16 @@ public class MainActivity extends AppCompatActivity {
     private AudioRecording currentRecord = null;
     private AudioRecording tempRecord = null;
 
-    private String[] sayWords = {"妈", "娜" , "他"};
+    private String[] sayWords = {"妈", "娜" , "他", "8", "爸", "打"};
     private int previousAccum = 0;
     private long tempStart = 0;
     private int displayCount = 0;
+
+    private SpeechToTextCallback chunkPartialSTTCallback = null;
+    private SpeechToTextCallback chunkFinalSTTCallback = null;
+
+    private SpeechToTextCallback completePartialSTTCallback = null;
+    private SpeechToTextCallback completeFinalSTTCallback = null;
 
     private void appendAudioEvent(AudioRecording recording, AudioEvent audioEvent) {
         if (recording != null) {
@@ -108,7 +96,8 @@ public class MainActivity extends AppCompatActivity {
                     long currentTime = System.currentTimeMillis();
                     long elapsedTime = currentTime - tempStart;
                     if (elapsedTime > Config.AUDIO_CHUNK_LENGTH) {
-                        processAndSaveAudioFile(tempRecord);
+                        processAndSaveAudioFile(tempRecord, Config.SST_DELETE_TMP, true, chunkPartialSTTCallback,
+                                chunkFinalSTTCallback);
                         tempRecord = new AudioRecording("tmp_" + currentTime);
                         tempStart = currentTime;
                     }
@@ -146,10 +135,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void initializeSpeechService() {
         microsoftSpeechToTextService = MicrosoftSpeechToTextService.getInstance(this);
-        microsoftSpeechToTextService.setSpeechToTextCallback(new SpeechToTextCallback() {
+        chunkFinalSTTCallback = new SpeechToTextCallback() {
             @Override
             public void process(String result) {
-                Log.v("SSTCallback", result);
+                Log.v("STTCallback", result);
                 int count = countMatchesAll(result, sayWords);
                 if (count > 0) {
                     Log.v("final previousAccum", "" + previousAccum + " count: " + count);
@@ -157,11 +146,11 @@ public class MainActivity extends AppCompatActivity {
                     setCounterCount(previousAccum);
                 }
             }
-        });
-        microsoftSpeechToTextService.setPartialSpeechToTextCallback(new SpeechToTextCallback() {
+        };
+        chunkPartialSTTCallback = new SpeechToTextCallback() {
             @Override
             public void process(String result) {
-                Log.v("Partial SSTCallback", result);
+                Log.v("Partial STTCallback", result);
                 int count = countMatchesAll(result, sayWords);
                 if (count > 0) {
                     Log.v("previousAccum", "" + previousAccum + " count: " + count);
@@ -171,7 +160,18 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             }
-        });
+        };
+        completeFinalSTTCallback = new SpeechToTextCallback() {
+            @Override
+            public void process(String result) {
+                Log.v("Complete STTCallback", result);
+                int count = countMatchesAll(result, sayWords);
+                if (count > 0) {
+                    Log.v("complete final", "count: " + count);
+                    setCounterCount(count);
+                }
+            }
+        };
     }
 
     @Override
@@ -212,36 +212,21 @@ public class MainActivity extends AppCompatActivity {
         AudioRecording countRecord = tempRecord;
         currentRecord = null;
         tempRecord = null;
-        saveAudioFile(processRecord);
-        processAndSaveAudioFile(countRecord);
+        processAndSaveAudioFile(countRecord, Config.SST_DELETE_TMP, true, chunkPartialSTTCallback,
+                chunkFinalSTTCallback);
+        processAndSaveAudioFile(processRecord, false, false, completePartialSTTCallback,
+                completeFinalSTTCallback);
 }
 
-    private void processAndSaveAudioFile(AudioRecording audioRecording) {
+    private void processAndSaveAudioFile(AudioRecording audioRecording, boolean deleteFile, boolean shortMode,
+                                         SpeechToTextCallback partialCallback, SpeechToTextCallback finalCallback) {
         AudioRecordingProcessAndSaveTask saveTask = new AudioRecordingProcessAndSaveTask();
-        saveTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, audioRecording);
-    }
-
-    private void saveAudioFile(AudioRecording audioRecording) {
-        AudioRecordingSaveTask saveTask = new AudioRecordingSaveTask();
-        saveTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, audioRecording);
+        saveTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, audioRecording, new Boolean(deleteFile),
+                new Boolean(shortMode), partialCallback, finalCallback);
     }
 
     private void setCounterCount(int count) {
         counterText.setText("Counter: " + count);
         displayCount = count;
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        if (microsoftSpeechToTextService != null) {
-        }
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (microsoftSpeechToTextService != null) {
-        }
     }
 }
