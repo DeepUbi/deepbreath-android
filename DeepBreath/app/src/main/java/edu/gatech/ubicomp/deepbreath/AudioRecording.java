@@ -20,6 +20,10 @@ public class AudioRecording {
         this.recordName = recordName;
     }
 
+    public String getRecordName() {
+        return recordName;
+    }
+
     public String getBaseFilePath() {
         if (recordPath == null) {
             String basePath = Environment.getExternalStorageDirectory() + "/" + Config.RECORD_FOLDER + "/";

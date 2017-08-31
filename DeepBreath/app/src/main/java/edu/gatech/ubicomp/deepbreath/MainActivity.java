@@ -7,7 +7,6 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
 import be.tarsos.dsp.AudioDispatcher;
 import be.tarsos.dsp.AudioEvent;
 import be.tarsos.dsp.AudioProcessor;
@@ -20,13 +19,13 @@ import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
 
-    private class AudioRecordingSaveTask extends AsyncTask<Object, Void, Void> {
+    private class AudioRecordingProcessAndSaveTask extends AsyncTask<Object, Void, Void> {
 
         @Override
         protected Void doInBackground(Object... params) {
             TarsosDSPAudioFormat audioFormat = dispatcher.getFormat();
             AudioRecording audioRecord = (AudioRecording) params[0];
-            Log.v("AudioRecordingSaveTask", "audioRecord base file: " + audioRecord.getBaseFilePath());
+            Log.v("AudioRecordingPSTask", "audioRecord base file: " + audioRecord.getBaseFilePath());
             WaveHeader waveHeader = new WaveHeader(WaveHeader.FORMAT_PCM, (short) audioFormat.getChannels(),
                     (int) audioFormat.getSampleRate(), (short) 16, audioRecord.getRecordWavLength());
             ByteArrayOutputStream header = new ByteArrayOutputStream();
@@ -47,6 +46,30 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+     private class AudioRecordingSaveTask extends AsyncTask<Object, Void, Void> {
+
+        @Override
+        protected Void doInBackground(Object... params) {
+            TarsosDSPAudioFormat audioFormat = dispatcher.getFormat();
+            AudioRecording audioRecord = (AudioRecording) params[0];
+            Log.v("AudioRecordingPSTask", "audioRecord base file: " + audioRecord.getBaseFilePath());
+            WaveHeader waveHeader = new WaveHeader(WaveHeader.FORMAT_PCM, (short) audioFormat.getChannels(),
+                    (int) audioFormat.getSampleRate(), (short) 16, audioRecord.getRecordWavLength());
+            ByteArrayOutputStream header = new ByteArrayOutputStream();
+            try {
+                if (audioRecord != null) {
+                    waveHeader.write(header);
+                    audioRecord.getRecordWav().seek(0);
+                    audioRecord.getRecordWav().write(header.toByteArray());
+                    audioRecord.getRecordWav().close();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+    }
+
     private Button startButton;
     private TextView counterText;
     private MicrosoftSpeechToTextService microsoftSpeechToTextService;
@@ -55,8 +78,22 @@ public class MainActivity extends AppCompatActivity {
     private AudioDispatcher dispatcher;
 
     private AudioRecording currentRecord = null;
+    private AudioRecording tempRecord = null;
 
-    private String sayWord = "la";
+    private String[] sayWords = {"妈", "娜" , "他"};
+    private int previousAccum = 0;
+    private long tempStart = 0;
+
+    private void appendAudioEvent(AudioRecording recording, AudioEvent audioEvent) {
+        if (recording != null) {
+            try {
+                recording.setRecordWavLength(recording.getRecordWavLength() + audioEvent.getByteBuffer().length);
+                recording.getRecordWav().write(audioEvent.getByteBuffer());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
     private void initializeRecordService() {
         audioService = AudioService.getInstance();
@@ -64,14 +101,15 @@ public class MainActivity extends AppCompatActivity {
         dispatcher.addAudioProcessor(new AudioProcessor() {
             @Override
             public boolean process(AudioEvent audioEvent) {
+                appendAudioEvent(currentRecord, audioEvent);
+                appendAudioEvent(tempRecord, audioEvent);
                 if (currentRecord != null) {
-                    try {
-                        currentRecord.setRecordWavLength(currentRecord.getRecordWavLength() + audioEvent.getByteBuffer().length);
-                        currentRecord.getRecordWav().write(audioEvent.getByteBuffer());
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    } catch (NullPointerException e) {
-                        e.printStackTrace();
+                    long currentTime = System.currentTimeMillis();
+                    long elapsedTime = currentTime - tempStart;
+                    if (elapsedTime > Config.AUDIO_CHUNK_LENGTH) {
+                        processAndSaveAudioFile(tempRecord);
+                        tempRecord = new AudioRecording("tmp_" + currentTime);
+                        tempStart = currentTime;
                     }
                 }
                 return true;
@@ -97,15 +135,25 @@ public class MainActivity extends AppCompatActivity {
         return count;
     }
 
+    private int countMatchesAll(String str, String[] findStrs) {
+        int count = 0;
+        for (String s : findStrs) {
+            count += countMatches(str, s);
+        }
+        return count;
+    }
+
     private void initializeSpeechService() {
         microsoftSpeechToTextService = MicrosoftSpeechToTextService.getInstance(this);
         microsoftSpeechToTextService.setSpeechToTextCallback(new SpeechToTextCallback() {
             @Override
             public void process(String result) {
                 Log.v("SSTCallback", result);
-                int count = countMatches(result, "妈");
+                int count = countMatchesAll(result, sayWords);
                 if (count > 0) {
-                    setCounterCount(count);
+                    Log.v("final previousAccum", "" + previousAccum + " count: " + count);
+                    previousAccum += count;
+                    setCounterCount(previousAccum);
                 }
             }
         });
@@ -113,9 +161,10 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void process(String result) {
                 Log.v("Partial SSTCallback", result);
-                int count = countMatches(result, "妈");
+                int count = countMatchesAll(result, sayWords);
                 if (count > 0) {
-                    setCounterCount(count);
+                    Log.v("previousAccum", "" + previousAccum + " count: " + count);
+                    setCounterCount(previousAccum + count);
                 }
             }
         });
@@ -145,22 +194,49 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void beginRecord() {
-        currentRecord = new AudioRecording("" + System.currentTimeMillis());
+        long currentTimeVal = System.currentTimeMillis();
+        String currentTime = "" + currentTimeVal;
+        tempStart = currentTimeVal;
+        currentRecord = new AudioRecording(currentTime);
+        tempRecord = new AudioRecording("tmp_" + currentTime);
         setCounterCount(0);
+        previousAccum = 0;
     }
 
     private void endRecord() {
         AudioRecording processRecord = currentRecord;
+        AudioRecording countRecord = tempRecord;
         currentRecord = null;
-        saveAudioRecordingToFile(processRecord);
+        tempRecord = null;
+        saveAudioFile(processRecord);
+        processAndSaveAudioFile(countRecord);
 }
 
-    private void saveAudioRecordingToFile(AudioRecording audioRecording) {
+    private void processAndSaveAudioFile(AudioRecording audioRecording) {
+        AudioRecordingProcessAndSaveTask saveTask = new AudioRecordingProcessAndSaveTask();
+        saveTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, audioRecording);
+    }
+
+    private void saveAudioFile(AudioRecording audioRecording) {
         AudioRecordingSaveTask saveTask = new AudioRecordingSaveTask();
         saveTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, audioRecording);
     }
 
     private void setCounterCount(int count) {
         counterText.setText("Counter: " + count);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (microsoftSpeechToTextService != null) {
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (microsoftSpeechToTextService != null) {
+        }
     }
 }

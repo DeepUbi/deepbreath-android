@@ -5,15 +5,19 @@ import android.util.Log;
 import com.microsoft.cognitiveservices.speechrecognition.*;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class MicrosoftSpeechToTextService implements ISpeechRecognitionServerEvents {
     public static final String MS_STT_LANGUAGE = "zh-CN";
-    public static final SpeechRecognitionMode MS_STT_MODE = SpeechRecognitionMode.LongDictation;
+    public static final SpeechRecognitionMode MS_STT_MODE = SpeechRecognitionMode.ShortPhrase;
 
     private static MicrosoftSpeechToTextService ourInstance = null;
 
     private Activity activity;
-    private DataRecognitionClient dataRecognitionClient;
 
     private SpeechToTextCallback speechToTextCallback = null;
     private SpeechToTextCallback partialSpeechToTextCallback = null;
@@ -31,8 +35,6 @@ public class MicrosoftSpeechToTextService implements ISpeechRecognitionServerEve
 
     private MicrosoftSpeechToTextService(Activity activity) {
         this.activity = activity;
-        dataRecognitionClient = SpeechRecognitionServiceFactory.createDataClient(activity, MS_STT_MODE, MS_STT_LANGUAGE,
-                this, Secret.MS_STT_KEY);
     }
 
     @Override
@@ -65,6 +67,12 @@ public class MicrosoftSpeechToTextService implements ISpeechRecognitionServerEve
     }
 
     public void dataRecognition(File file) {
+        fileDataRecognition(file, Config.SST_DELETE_TMP);
+    }
+
+    private void fileDataRecognition(File file, boolean deleteFile) {
+        DataRecognitionClient dataRecognitionClient = SpeechRecognitionServiceFactory.createDataClient(activity,
+                MS_STT_MODE, MS_STT_LANGUAGE,this, Secret.MS_STT_KEY);
         try {
             InputStream fileStream = new FileInputStream(file);
             int bytesRead = 0;
@@ -76,6 +84,10 @@ public class MicrosoftSpeechToTextService implements ISpeechRecognitionServerEve
                     dataRecognitionClient.sendAudio(buffer, bytesRead);
                 }
             } while (bytesRead > 0);
+            fileStream.close();
+            if (deleteFile) {
+                file.delete();
+            }
         } catch (IOException e) {
             e.printStackTrace();
             Contract.fail();
