@@ -83,6 +83,7 @@ public class MainActivity extends AppCompatActivity {
     private String[] sayWords = {"妈", "娜" , "他"};
     private int previousAccum = 0;
     private long tempStart = 0;
+    private int displayCount = 0;
 
     private void appendAudioEvent(AudioRecording recording, AudioEvent audioEvent) {
         if (recording != null) {
@@ -164,7 +165,10 @@ public class MainActivity extends AppCompatActivity {
                 int count = countMatchesAll(result, sayWords);
                 if (count > 0) {
                     Log.v("previousAccum", "" + previousAccum + " count: " + count);
-                    setCounterCount(previousAccum + count);
+                    int newCount = previousAccum + count;
+                    if (newCount > displayCount) {
+                        setCounterCount(previousAccum + count);
+                    }
                 }
             }
         });
@@ -224,6 +228,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void setCounterCount(int count) {
         counterText.setText("Counter: " + count);
+        displayCount = count;
     }
 
     @Override
