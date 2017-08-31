@@ -7,8 +7,8 @@ import com.microsoft.cognitiveservices.speechrecognition.*;
 import java.io.*;
 
 public class MicrosoftSpeechToTextService implements ISpeechRecognitionServerEvents {
-    public static final String MS_STT_LANGUAGE = "en-us";
-    public static final SpeechRecognitionMode MS_STT_MODE = SpeechRecognitionMode.ShortPhrase;
+    public static final String MS_STT_LANGUAGE = "zh-CN";
+    public static final SpeechRecognitionMode MS_STT_MODE = SpeechRecognitionMode.LongDictation;
 
     private static MicrosoftSpeechToTextService ourInstance = null;
 

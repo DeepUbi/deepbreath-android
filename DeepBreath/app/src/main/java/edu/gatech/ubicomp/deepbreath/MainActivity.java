@@ -103,12 +103,20 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void process(String result) {
                 Log.v("SSTCallback", result);
+                int count = countMatches(result, "妈");
+                if (count > 0) {
+                    setCounterCount(count);
+                }
             }
         });
         microsoftSpeechToTextService.setPartialSpeechToTextCallback(new SpeechToTextCallback() {
             @Override
             public void process(String result) {
                 Log.v("Partial SSTCallback", result);
+                int count = countMatches(result, "妈");
+                if (count > 0) {
+                    setCounterCount(count);
+                }
             }
         });
     }
@@ -126,8 +134,10 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 Log.v("MainActivity", "startButton clicked");
                 if (currentRecord == null) {
+                    startButton.setText("Stop");
                     beginRecord();
                 } else {
+                    startButton.setText("Start");
                     endRecord();
                 }
             }
