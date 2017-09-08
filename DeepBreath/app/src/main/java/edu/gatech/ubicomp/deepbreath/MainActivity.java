@@ -1,6 +1,11 @@
 package edu.gatech.ubicomp.deepbreath;
 
+import android.content.Intent;
+import android.content.res.AssetFileDescriptor;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.os.AsyncTask;
+import android.os.Handler;
 import android.os.PowerManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -179,8 +184,73 @@ public class MainActivity extends AppCompatActivity {
                     Log.v("complete final", "count: " + count);
                     setCounterCount(count);
                 }
+                // TODO: add some kind of callback and loading animation
+                launchFinishScreen("" + count);
             }
         };
+    }
+
+    private void acquireWakeLock() {
+        if (wakeLock != null && !wakeLock.isHeld()) {
+            wakeLock.acquire();
+        }
+    }
+
+    private void releaseWakeLock() {
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+        }
+    }
+
+    private void presentInstructions() {
+        disableStartButton();
+        Runnable instructionsRunnable = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final MediaPlayer player = new MediaPlayer();
+                    player.setAudioStreamType(AudioManager.STREAM_VOICE_CALL);
+                    AssetFileDescriptor afd = getAssets().openFd("instructions.mp3");
+                    player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+                    player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                        @Override
+                        public void onCompletion(MediaPlayer mediaPlayer) {
+                            enableStartButton();
+                            startButton.performClick();
+                            try {
+                                final MediaPlayer beepPlayer = new MediaPlayer();
+                                beepPlayer.setAudioStreamType(AudioManager.STREAM_VOICE_CALL);
+                                AssetFileDescriptor beepAfd = getAssets().openFd("beep.wav");
+                                beepPlayer.setDataSource(beepAfd.getFileDescriptor(), beepAfd.getStartOffset(), beepAfd.getLength());
+                                beepPlayer.prepare();
+                                beepPlayer.start();
+                                beepPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                                    @Override
+                                    public void onCompletion(MediaPlayer mediaPlayer) {
+                                        if (beepPlayer != null) {
+                                            beepPlayer.release();
+                                        }
+                                    }
+                                });
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                                enableStartButton();
+                            }
+                            if (player != null) {
+                                player.release();
+                            }
+                        }
+                    });
+                    player.prepare();
+                    player.start();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    enableStartButton();
+                }
+            }
+        };
+        final Handler handler = new Handler();
+        handler.postDelayed(instructionsRunnable, Config.INSTRUCTIONS_DELAY);
     }
 
     @Override
@@ -194,9 +264,7 @@ public class MainActivity extends AppCompatActivity {
         powerManager = (PowerManager) getSystemService(POWER_SERVICE);
         wakeLock = powerManager.newWakeLock(field, getLocalClassName());
         setContentView(R.layout.activity_main);
-        if (wakeLock != null && !wakeLock.isHeld()) {
-            wakeLock.acquire();
-        }
+        acquireWakeLock();
         participantPrefix = getIntent().getExtras().getString("prefix");
         filePrefix = participantPrefix + "_";
         initializeSpeechService();
@@ -213,17 +281,49 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     startButton.setText("Start");
                     endRecord();
+                    disableStartButton();
                 }
             }
         });
+        presentInstructions();
+    }
+
+    private void launchFinishScreen(String score) {
+        Intent activityIntent = new Intent(MainActivity.this, FinishActivity.class);
+        Bundle extras = new Bundle();
+        extras.putString("prefix", participantPrefix);
+        extras.putString("score", score);
+        activityIntent.putExtras(extras);
+        startActivity(activityIntent);
+        finish();
+    }
+
+    private void disableStartButton() {
+        startButton.setVisibility(View.INVISIBLE);
+        startButton.setClickable(false);
+    }
+
+    private void enableStartButton() {
+        startButton.setVisibility(View.VISIBLE);
+        startButton.setClickable(true);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (wakeLock != null && wakeLock.isHeld()) {
-            wakeLock.release();
-        }
+        releaseWakeLock();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        acquireWakeLock();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        releaseWakeLock();
     }
 
     private void beginRecord() {

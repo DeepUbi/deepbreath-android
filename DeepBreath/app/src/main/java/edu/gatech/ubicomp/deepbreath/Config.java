@@ -6,4 +6,5 @@ public class Config {
     public static final String RECORD_FOLDER = "DeepBreath";
     public static final int AUDIO_CHUNK_LENGTH = 2000;
     public static final boolean SST_DELETE_TMP = true;
+    public static final int INSTRUCTIONS_DELAY = 2000;
 }

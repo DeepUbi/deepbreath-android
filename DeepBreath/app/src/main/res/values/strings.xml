@@ -4,4 +4,7 @@
         <item>Male</item>
         <item>Female</item>
     </string-array>
+    <string name="start_instructions">When ready, press the Start button and immediately place phone to ear, as if in a
+        phone call
+    </string>
 </resources>

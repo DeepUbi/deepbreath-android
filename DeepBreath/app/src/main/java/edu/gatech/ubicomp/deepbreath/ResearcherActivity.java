@@ -71,7 +71,7 @@ public class ResearcherActivity extends AppCompatActivity {
         participantData.put("age", participantAge);
         String participantPrefix = participantNumber + "_t_" + System.currentTimeMillis();
         createInfoFile(participantPrefix, participantData);
-        Intent activityIntent = new Intent(ResearcherActivity.this, MainActivity.class);
+        Intent activityIntent = new Intent(ResearcherActivity.this, StartActivity.class);
         Bundle extras = new Bundle();
         extras.putString("prefix", participantPrefix);
         activityIntent.putExtras(extras);
