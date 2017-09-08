@@ -1,6 +1,7 @@
 package edu.gatech.ubicomp.deepbreath;
 
 import android.os.AsyncTask;
+import android.os.PowerManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -67,11 +68,19 @@ public class MainActivity extends AppCompatActivity {
     private long tempStart = 0;
     private int displayCount = 0;
 
+    private String participantPrefix;
+    private String filePrefix;
+
     private SpeechToTextCallback chunkPartialSTTCallback = null;
     private SpeechToTextCallback chunkFinalSTTCallback = null;
 
     private SpeechToTextCallback completePartialSTTCallback = null;
     private SpeechToTextCallback completeFinalSTTCallback = null;
+
+    private PowerManager powerManager;
+    private PowerManager.WakeLock wakeLock;
+
+    private int field = 0x00000020;
 
     private void appendAudioEvent(AudioRecording recording, AudioEvent audioEvent) {
         if (recording != null) {
@@ -98,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
                     if (elapsedTime > Config.AUDIO_CHUNK_LENGTH) {
                         processAndSaveAudioFile(tempRecord, Config.SST_DELETE_TMP, true, chunkPartialSTTCallback,
                                 chunkFinalSTTCallback);
-                        tempRecord = new AudioRecording("tmp_" + currentTime);
+                        tempRecord = new AudioRecording(filePrefix + "tmp_" + currentTime);
                         tempStart = currentTime;
                     }
                 }
@@ -177,7 +186,19 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        try {
+            field = PowerManager.class.getClass().getField("PROXIMITY_SCREEN_OFF_WAKE_LOCK").getInt(null);
+        } catch (Throwable ignored) {
+
+        }
+        powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+        wakeLock = powerManager.newWakeLock(field, getLocalClassName());
         setContentView(R.layout.activity_main);
+        if (wakeLock != null && !wakeLock.isHeld()) {
+            wakeLock.acquire();
+        }
+        participantPrefix = getIntent().getExtras().getString("prefix");
+        filePrefix = participantPrefix + "_";
         initializeSpeechService();
         initializeRecordService();
         counterText = (TextView) findViewById(R.id.counterText);
@@ -197,12 +218,20 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+        }
+    }
+
     private void beginRecord() {
         long currentTimeVal = System.currentTimeMillis();
         String currentTime = "" + currentTimeVal;
         tempStart = currentTimeVal;
-        currentRecord = new AudioRecording(currentTime);
-        tempRecord = new AudioRecording("tmp_" + currentTime);
+        currentRecord = new AudioRecording(filePrefix + currentTime);
+        tempRecord = new AudioRecording(filePrefix + "tmp_" + currentTime);
         setCounterCount(0);
         previousAccum = 0;
     }

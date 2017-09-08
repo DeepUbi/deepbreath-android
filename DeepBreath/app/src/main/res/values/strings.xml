@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">Deep Breath</string>
+    <string-array name="participant_sex_array">
+        <item>Male</item>
+        <item>Female</item>
+    </string-array>
 </resources>
