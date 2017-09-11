@@ -15,7 +15,8 @@
             android:roundIcon="@mipmap/ic_launcher_round"
             android:supportsRtl="true"
             android:theme="@style/AppTheme">
-        <activity android:name=".ResearcherActivity">
+        <activity android:name=".ResearcherActivity"
+        android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
 
@@ -25,9 +26,11 @@
         <activity android:name=".MainActivity"
         android:screenOrientation="portrait">
         </activity>
-        <activity android:name=".StartActivity">
+        <activity android:name=".StartActivity"
+        android:screenOrientation="portrait">
         </activity>
-        <activity android:name=".FinishActivity">
+        <activity android:name=".FinishActivity"
+        android:screenOrientation="portrait">
         </activity>
     </application>
 

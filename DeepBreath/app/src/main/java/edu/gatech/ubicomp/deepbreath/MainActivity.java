@@ -35,6 +35,8 @@ public class MainActivity extends AppCompatActivity {
             boolean shortMode = ((Boolean) params[2]).booleanValue();
             SpeechToTextCallback partialCallback = (SpeechToTextCallback) params[3];
             SpeechToTextCallback finalCallback = (SpeechToTextCallback) params[4];
+            Runnable onError = (Runnable) params[5];
+            Runnable onFailure = (Runnable) params[6];
             Log.v("AudioRecordingPSTask", "audioRecord base file: " + audioRecord.getBaseFilePath());
             WaveHeader waveHeader = new WaveHeader(WaveHeader.FORMAT_PCM, (short) audioFormat.getChannels(),
                     (int) audioFormat.getSampleRate(), (short) 16, audioRecord.getRecordWavLength());
@@ -48,7 +50,7 @@ public class MainActivity extends AppCompatActivity {
                     if (microsoftSpeechToTextService != null) {
                         microsoftSpeechToTextService.dataRecognition(
                                 new File(audioRecord.getBaseFilePath() + ".wav"), deleteFile, shortMode,
-                                partialCallback, finalCallback);
+                                partialCallback, finalCallback, onFailure, onError);
                     }
                 }
             } catch (IOException e) {
@@ -78,14 +80,22 @@ public class MainActivity extends AppCompatActivity {
 
     private SpeechToTextCallback chunkPartialSTTCallback = null;
     private SpeechToTextCallback chunkFinalSTTCallback = null;
+    private Runnable chunkOnError = null;
+    private Runnable chunkOnFail = null;
 
     private SpeechToTextCallback completePartialSTTCallback = null;
     private SpeechToTextCallback completeFinalSTTCallback = null;
+    private Runnable completeOnError = null;
+    private Runnable completeOnFail = null;
 
     private PowerManager powerManager;
     private PowerManager.WakeLock wakeLock;
 
     private int field = 0x00000020;
+
+    private boolean waitForResult = true;
+    private boolean launchedResult = false;
+    private boolean hasInternet;
 
     private void appendAudioEvent(AudioRecording recording, AudioEvent audioEvent) {
         if (recording != null) {
@@ -111,7 +121,7 @@ public class MainActivity extends AppCompatActivity {
                     long elapsedTime = currentTime - tempStart;
                     if (elapsedTime > Config.AUDIO_CHUNK_LENGTH) {
                         processAndSaveAudioFile(tempRecord, Config.SST_DELETE_TMP, true, chunkPartialSTTCallback,
-                                chunkFinalSTTCallback);
+                                chunkFinalSTTCallback, chunkOnError, chunkOnFail);
                         tempRecord = new AudioRecording(filePrefix + "tmp_" + currentTime);
                         tempStart = currentTime;
                     }
@@ -148,6 +158,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initializeSpeechService() {
+        if (!hasInternet) {
+            return;
+        }
         microsoftSpeechToTextService = MicrosoftSpeechToTextService.getInstance(this);
         chunkFinalSTTCallback = new SpeechToTextCallback() {
             @Override
@@ -175,6 +188,26 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         };
+        chunkOnError = new Runnable() {
+            @Override
+            public void run() {
+                Log.v("chunkOnError", "A chunk error has occured");
+                waitForResult = false;
+            }
+        };
+        chunkOnFail = new Runnable() {
+            @Override
+            public void run() {
+                Log.v("chunkOnFail", "A chunk failure has occured");
+                waitForResult = false;
+            }
+        };
+        completePartialSTTCallback = new SpeechToTextCallback() {
+            @Override
+            public void process(String result) {
+                Log.v("completePSTT", result);
+            }
+        };
         completeFinalSTTCallback = new SpeechToTextCallback() {
             @Override
             public void process(String result) {
@@ -186,6 +219,34 @@ public class MainActivity extends AppCompatActivity {
                 }
                 // TODO: add some kind of callback and loading animation
                 launchFinishScreen("" + count);
+            }
+        };
+        chunkOnError = new Runnable() {
+            @Override
+            public void run() {
+                Log.v("chunkOnError", "A chunk error has occured");
+                waitForResult = false;
+            }
+        };
+        chunkOnFail = new Runnable() {
+            @Override
+            public void run() {
+                Log.v("chunkOnFail", "A chunk fail has occured");
+                waitForResult = false;
+            }
+        };
+        completeOnError = new Runnable() {
+            @Override
+            public void run() {
+                Log.v("completeOnError", "A complete error has occured");
+                waitForResult = false;
+            }
+        };
+        completeOnFail = new Runnable() {
+            @Override
+            public void run() {
+                Log.v("completeOnFail", "A complete fail has occured");
+                waitForResult = false;
             }
         };
     }
@@ -267,9 +328,15 @@ public class MainActivity extends AppCompatActivity {
         acquireWakeLock();
         participantPrefix = getIntent().getExtras().getString("prefix");
         filePrefix = participantPrefix + "_";
+        boolean hasInternet = getIntent().getExtras().getInt("internet") == 1;
+        this.hasInternet = hasInternet;
+        waitForResult = hasInternet;
         initializeSpeechService();
         initializeRecordService();
         counterText = (TextView) findViewById(R.id.counterText);
+        if (!hasInternet) {
+            counterText.setVisibility(View.INVISIBLE);
+        }
         startButton = (Button) findViewById(R.id.startButton);
         startButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -282,6 +349,9 @@ public class MainActivity extends AppCompatActivity {
                     startButton.setText("Start");
                     endRecord();
                     disableStartButton();
+                    if (!waitForResult) {
+                        launchFinishScreen(counterText.getText().toString());
+                    }
                 }
             }
         });
@@ -289,13 +359,21 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void launchFinishScreen(String score) {
+        if (launchedResult) {
+            return;
+        }
         Intent activityIntent = new Intent(MainActivity.this, FinishActivity.class);
         Bundle extras = new Bundle();
         extras.putString("prefix", participantPrefix);
-        extras.putString("score", score);
+        if (hasInternet) {
+            extras.putString("score", score);
+        } else {
+            extras.putString("score", "NA");
+        }
         activityIntent.putExtras(extras);
         startActivity(activityIntent);
         finish();
+        launchedResult = true;
     }
 
     private void disableStartButton() {
@@ -342,16 +420,17 @@ public class MainActivity extends AppCompatActivity {
         currentRecord = null;
         tempRecord = null;
         processAndSaveAudioFile(countRecord, Config.SST_DELETE_TMP, true, chunkPartialSTTCallback,
-                chunkFinalSTTCallback);
+                chunkFinalSTTCallback, chunkOnError, chunkOnFail);
         processAndSaveAudioFile(processRecord, false, false, completePartialSTTCallback,
-                completeFinalSTTCallback);
+                completeFinalSTTCallback, completeOnError, completeOnFail);
 }
 
     private void processAndSaveAudioFile(AudioRecording audioRecording, boolean deleteFile, boolean shortMode,
-                                         SpeechToTextCallback partialCallback, SpeechToTextCallback finalCallback) {
+                                         SpeechToTextCallback partialCallback, SpeechToTextCallback finalCallback,
+                                         Runnable onError, Runnable onFailure) {
         AudioRecordingProcessAndSaveTask saveTask = new AudioRecordingProcessAndSaveTask();
         saveTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, audioRecording, new Boolean(deleteFile),
-                new Boolean(shortMode), partialCallback, finalCallback);
+                new Boolean(shortMode), partialCallback, finalCallback, onError, onFailure);
     }
 
     private void setCounterCount(int count) {

@@ -6,12 +6,14 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.Toast;
 
 public class StartActivity extends AppCompatActivity {
 
     private String participantPrefix;
     private Button participantStartButton;
+    private CheckBox internetCheckbox;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -25,6 +27,7 @@ public class StartActivity extends AppCompatActivity {
                 launchExperiment();
             }
         });
+        internetCheckbox = (CheckBox) findViewById(R.id.internetCheckbox);
     }
 
     private void launchExperiment() {
@@ -36,6 +39,7 @@ public class StartActivity extends AppCompatActivity {
         Intent activityIntent = new Intent(StartActivity.this, MainActivity.class);
         Bundle extras = new Bundle();
         extras.putString("prefix", participantPrefix);
+        extras.putInt("internet", internetCheckbox.isChecked() ? 1 : 0);
         activityIntent.putExtras(extras);
         startActivity(activityIntent);
         finish();

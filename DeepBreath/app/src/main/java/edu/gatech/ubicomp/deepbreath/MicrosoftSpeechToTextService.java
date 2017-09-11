@@ -5,11 +5,6 @@ import android.util.Log;
 import com.microsoft.cognitiveservices.speechrecognition.*;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class MicrosoftSpeechToTextService {
     public static final String MS_STT_LANGUAGE = "zh-CN";
@@ -34,63 +29,76 @@ public class MicrosoftSpeechToTextService {
 
     public void dataRecognition(File file, boolean deleteFile, boolean shortMode,
                                 SpeechToTextCallback partialSpeechToTextCallback,
-                                SpeechToTextCallback speechToTextCallback) {
+                                SpeechToTextCallback speechToTextCallback, final Runnable failureRunnable,
+                                final Runnable errorRunnable) {
 
         final SpeechToTextCallback psttCallback = partialSpeechToTextCallback;
         final SpeechToTextCallback fsttCallback = speechToTextCallback;
         SpeechRecognitionMode speechRecognitionMode = shortMode ? SpeechRecognitionMode.ShortPhrase :
                 SpeechRecognitionMode.LongDictation;
-        DataRecognitionClient dataRecognitionClient = SpeechRecognitionServiceFactory.createDataClient(activity,
-                speechRecognitionMode, MS_STT_LANGUAGE, new ISpeechRecognitionServerEvents() {
-                    @Override
-                    public void onPartialResponseReceived(String s) {
-                        Log.v("MSSTTService", "onPartialResponseReceived");
-                        if (psttCallback != null) {
-                            psttCallback.process(s);
-                        }
-                    }
 
-                    @Override
-                    public void onFinalResponseReceived(RecognitionResult recognitionResult) {
-                        Log.v("MSSTTService", "onFinalResponseReceived");
-                        RecognizedPhrase[] results = recognitionResult.Results;
-                        if (results.length > 0) {
-                            RecognizedPhrase bestResult = results[0];
-                            if (results.length > 1) {
-                                for (int i = 1; i < results.length; i++) {
-                                    RecognizedPhrase candidateResult = results[i];
-                                    if (candidateResult.Confidence.compareTo(bestResult.Confidence) > 0) {
-                                        bestResult = candidateResult;
+        DataRecognitionClient dataRecognitionClient = null;
+        try {
+             dataRecognitionClient = SpeechRecognitionServiceFactory.createDataClient(activity,
+                    speechRecognitionMode, MS_STT_LANGUAGE, new ISpeechRecognitionServerEvents() {
+                        @Override
+                        public void onPartialResponseReceived(String s) {
+                            Log.v("MSSTTService", "onPartialResponseReceived");
+                            if (psttCallback != null) {
+                                psttCallback.process(s);
+                            }
+                        }
+                        @Override
+                        public void onFinalResponseReceived(RecognitionResult recognitionResult) {
+                            Log.v("MSSTTService", "onFinalResponseReceived");
+                            RecognizedPhrase[] results = recognitionResult.Results;
+                            String bestText = "";
+                            if (results.length > 0) {
+                                RecognizedPhrase bestResult = results[0];
+                                if (results.length > 1) {
+                                    for (int i = 1; i < results.length; i++) {
+                                        RecognizedPhrase candidateResult = results[i];
+                                        if (candidateResult.Confidence.compareTo(bestResult.Confidence) > 0) {
+                                            bestResult = candidateResult;
+                                        }
                                     }
                                 }
+                                bestText = bestResult.DisplayText;
+
                             }
-                            String bestText = bestResult.DisplayText;
                             if (fsttCallback != null) {
                                 fsttCallback.process(bestText);
                             }
                         }
-                    }
 
-                    @Override
-                    public void onIntentReceived(String s) {
+                        @Override
+                        public void onIntentReceived(String s) {
 
-                    }
+                        }
 
-                    @Override
-                    public void onError(int i, String s) {
+                        @Override
+                        public void onError(int i, String s) {
+                            if (errorRunnable != null) {
+                                errorRunnable.run();
+                            }
+                        }
 
-                    }
+                        @Override
+                        public void onAudioEvent(boolean b) {
 
-                    @Override
-                    public void onAudioEvent(boolean b) {
-
-                    }
-                }, Secret.MS_STT_KEY);
+                        }
+                    }, Secret.MS_STT_KEY);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        if (dataRecognitionClient == null) {
+            failureRunnable.run();
+            return;
+        }
         try {
             InputStream fileStream = new FileInputStream(file);
-            int bytesRead = 0;
-            byte[] buffer = new byte[1024];
-
+            int bytesRead;
+            byte[] buffer = new byte[8192];
             do {
                 bytesRead = fileStream.read(buffer);
                 if (bytesRead > -1) {
@@ -104,6 +112,9 @@ public class MicrosoftSpeechToTextService {
         } catch (IOException e) {
             e.printStackTrace();
             Contract.fail();
+            if (failureRunnable != null) {
+                failureRunnable.run();
+            }
         } finally {
             dataRecognitionClient.endAudio();
         }
