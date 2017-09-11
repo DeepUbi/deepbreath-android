@@ -98,7 +98,7 @@ public class MicrosoftSpeechToTextService {
         try {
             InputStream fileStream = new FileInputStream(file);
             int bytesRead;
-            byte[] buffer = new byte[8192];
+            byte[] buffer = new byte[2048];
             do {
                 bytesRead = fileStream.read(buffer);
                 if (bytesRead > -1) {

@@ -70,7 +70,7 @@ public class MainActivity extends AppCompatActivity {
     private AudioRecording currentRecord = null;
     private AudioRecording tempRecord = null;
 
-    private String[] sayWords = {"妈", "娜" , "他", "8", "爸", "打"};
+    private String[] sayWords = {"妈", "娜" , "他", "8", "爸", "打", "慢"};
     private int previousAccum = 0;
     private long tempStart = 0;
     private int displayCount = 0;
@@ -265,49 +265,24 @@ public class MainActivity extends AppCompatActivity {
 
     private void presentInstructions() {
         disableStartButton();
+        final Runnable failedRunnable = new Runnable() {
+            @Override
+            public void run() {
+                enableStartButton();
+            }
+        };
         Runnable instructionsRunnable = new Runnable() {
             @Override
             public void run() {
-                try {
-                    final MediaPlayer player = new MediaPlayer();
-                    player.setAudioStreamType(AudioManager.STREAM_VOICE_CALL);
-                    AssetFileDescriptor afd = getAssets().openFd("instructions.mp3");
-                    player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
-                    player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-                        @Override
-                        public void onCompletion(MediaPlayer mediaPlayer) {
-                            enableStartButton();
-                            startButton.performClick();
-                            try {
-                                final MediaPlayer beepPlayer = new MediaPlayer();
-                                beepPlayer.setAudioStreamType(AudioManager.STREAM_VOICE_CALL);
-                                AssetFileDescriptor beepAfd = getAssets().openFd("beep.wav");
-                                beepPlayer.setDataSource(beepAfd.getFileDescriptor(), beepAfd.getStartOffset(), beepAfd.getLength());
-                                beepPlayer.prepare();
-                                beepPlayer.start();
-                                beepPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-                                    @Override
-                                    public void onCompletion(MediaPlayer mediaPlayer) {
-                                        if (beepPlayer != null) {
-                                            beepPlayer.release();
-                                        }
-                                    }
-                                });
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                                enableStartButton();
-                            }
-                            if (player != null) {
-                                player.release();
-                            }
-                        }
-                    });
-                    player.prepare();
-                    player.start();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    enableStartButton();
-                }
+                final AudioPlayerService playerService = AudioPlayerService.getInstance(getApplicationContext());
+                playerService.playAssetFile("instructions.mp3", new Runnable() {
+                    @Override
+                    public void run() {
+                        enableStartButton();
+                        startButton.performClick();
+                        playerService.playAssetFile("beep.wav", null, failedRunnable);
+                    }
+                }, failedRunnable);
             }
         };
         final Handler handler = new Handler();
