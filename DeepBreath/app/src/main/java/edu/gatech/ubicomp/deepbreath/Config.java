@@ -7,4 +7,5 @@ public class Config {
     public static final int AUDIO_CHUNK_LENGTH = 3000;
     public static final boolean SST_DELETE_TMP = true;
     public static final int INSTRUCTIONS_DELAY = 2000;
+    public static final int SCORE_DELAY = 10000;
 }

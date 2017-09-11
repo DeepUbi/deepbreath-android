@@ -351,6 +351,14 @@ public class MainActivity extends AppCompatActivity {
                     disableStartButton();
                     if (!waitForResult) {
                         launchFinishScreen(counterText.getText().toString());
+                    } else {
+                        final Handler resultHandler = new Handler();
+                        resultHandler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                launchFinishScreen(counterText.getText().toString());
+                            }
+                        }, Config.SCORE_DELAY);
                     }
                 }
             }
