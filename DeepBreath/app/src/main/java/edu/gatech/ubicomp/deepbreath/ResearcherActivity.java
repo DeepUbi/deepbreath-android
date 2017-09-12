@@ -1,7 +1,10 @@
 package edu.gatech.ubicomp.deepbreath;
 
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Environment;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -20,10 +23,23 @@ public class ResearcherActivity extends AppCompatActivity {
     private EditText participantAgeText;
     private Button researcherConfirmButton;
 
+
+    private void checkFeaturesAndPermissions() {
+
+        for (String s : Config.APP_PERMISSIONS) {
+            int permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), s);
+            if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+                Log.i("location", "no permission");
+                ActivityCompat.requestPermissions(this, Config.APP_PERMISSIONS, 1);
+            }
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_researcher);
+        checkFeaturesAndPermissions();
         participantNumberText = (EditText) findViewById(R.id.participantIdText);
         participantSexSpinner = (Spinner) findViewById(R.id.participantSexSpinner);
         ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this, R.array.participant_sex_array,
