@@ -70,7 +70,7 @@ public class MainActivity extends AppCompatActivity {
     private AudioRecording currentRecord = null;
     private AudioRecording tempRecord = null;
 
-    private String[] sayWords = {"妈", "娜" , "他", "8", "爸", "打", "慢"};
+    private String[] sayWords = {"妈", "娜" , "他", "8", "爸", "打", "慢", "啦"};
     private int previousAccum = 0;
     private long tempStart = 0;
     private int displayCount = 0;
