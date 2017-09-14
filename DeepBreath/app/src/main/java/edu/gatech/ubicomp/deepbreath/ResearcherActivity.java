@@ -92,5 +92,6 @@ public class ResearcherActivity extends AppCompatActivity {
         extras.putString("prefix", participantPrefix);
         activityIntent.putExtras(extras);
         startActivity(activityIntent);
+        finish();
     }
 }
