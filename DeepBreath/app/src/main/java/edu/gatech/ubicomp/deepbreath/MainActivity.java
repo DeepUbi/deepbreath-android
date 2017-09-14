@@ -225,14 +225,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 Log.v("chunkOnError", "A chunk error has occured");
-                waitForResult = false;
             }
         };
         chunkOnFail = new Runnable() {
             @Override
             public void run() {
                 Log.v("chunkOnFail", "A chunk fail has occured");
-                waitForResult = false;
             }
         };
         completeOnError = new Runnable() {
