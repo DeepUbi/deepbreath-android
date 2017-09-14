@@ -28,6 +28,12 @@ public class AudioPlayerService {
 
     public void playAssetFile(String fileName, final Runnable onCompleted, Runnable onFailed) {
         try {
+            if (mediaPlayer != null) {
+                if (mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                }
+                mediaPlayer.reset();
+            }
             AssetFileDescriptor afd = context.getAssets().openFd(fileName);
             mediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
             mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
@@ -51,6 +57,12 @@ public class AudioPlayerService {
     }
     public void playURL(String url, final Runnable onCompleted, Runnable onFailed) {
          try {
+             if (mediaPlayer != null) {
+                 if (mediaPlayer.isPlaying()) {
+                     mediaPlayer.stop();
+                 }
+                 mediaPlayer.reset();
+             }
             mediaPlayer.setDataSource(url);
             mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                 @Override
