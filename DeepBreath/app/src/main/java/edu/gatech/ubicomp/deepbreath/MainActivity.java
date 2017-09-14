@@ -213,6 +213,7 @@ public class MainActivity extends AppCompatActivity {
             public void process(String result) {
                 Log.v("Complete STTCallback", result);
                 int count = countMatchesAll(result, sayWords);
+                count = Math.max(count, displayCount);
                 if (count > 0) {
                     Log.v("complete final", "count: " + count);
                     setCounterCount(count);
